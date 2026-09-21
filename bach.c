@@ -50,6 +50,8 @@ int main(int argc, char *argv[]){
 			int subSize = cmdParser(line[0], subLine, " > "); // cat hey.txt hello.txt -> 1
 
 			if(subSize == 1){
+
+
 				char *subSubLine[10];
 
 				int subSubSize = cmdParser(subLine[0], subSubLine ," ");
@@ -67,7 +69,7 @@ int main(int argc, char *argv[]){
 				}
 				else {
 					int status;
-					pid_t filho_terminado = wait(&status);
+					wait(&status);
 				}
 			}else {
 					int pid = fork();
@@ -91,7 +93,7 @@ int main(int argc, char *argv[]){
 
     				}else {
     					int status;
-    					pid_t filho_terminado = wait(&status);
+    					wait(&status);
     				}
 
 			}
