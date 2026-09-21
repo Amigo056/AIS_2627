@@ -11,29 +11,25 @@
 #define MAX_LINE 256
 #define MAX_ARGS 10
 
-int cmdProcessor(char *input, char *processed[], char *del) {
-    char *copy = strdup(input);
-    int idx = 0;
+int cmdParser(char *input, char *processed[], char *del) {
+	char *copy = strdup(input);
+	int idx = 0;
 
-    char *token = strtok(copy, del);
+	char *token = strtok(copy, del);
 
-    while(token != NULL){
-        processed[idx] = strdup(token);
-        idx++;
-        token = strtok(NULL, del);
-
-        if (processed[idx] == NULL) {
-            break;
-        }
-    }
-    processed[idx] = NULL;
-    return idx;
+	while(token != NULL){
+		processed[idx] = strdup(token);
+		idx++;
+		token = strtok(NULL, del);
+	}
+	processed[idx] = NULL;
+	return idx;
 }
 
 int main(int argc, char *argv[]){
-    char buffer[MAX_LINE];
+	char buffer[MAX_LINE];
 
-    while (1) {
+	while (1) {
         printf("$ ");
 
         if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
@@ -44,67 +40,76 @@ int main(int argc, char *argv[]){
 
         char *line[MAX_ARGS];
 
-        int size = cmdProcessor(buffer, line, " | ");
+        int size = cmdParser(buffer, line, "|"); // cat hey.txt  hello.txt -> 1
+        if (size == 0) {
+            continue;
+        }
 
         if(size > 1){
 
-        }else {
-            char *subLine[MAX_ARGS];
+	    }else {
+			char *subLine[MAX_ARGS];
 
-            int subSize = cmdProcessor(line[0], subLine, " > ");
-
-            if(subSize == 1){
-                char *subSubLine[MAX_ARGS];
-
-                int subSubSize = cmdProcessor(subLine[0], subSubLine ," ");
-
-                int pid = fork();
-
-                if(pid < 0){
-
-                    perror("Fork failed");
-                    return 1;
-                }
-                else if(pid ==0){
-                    execvp(subSubLine[0], subSubLine);
-                    exit(0);
-                }
-                else {
-                    int status;
-                    pid_t filho_terminado = wait(&status);
-                }
-            }else {
-                char *dst = subLine[subSize];
-                subLine[subSize] = NULL;
-                int fd = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-
-                if (fd < 0) {
-                    perror("Erro ao abrir o ficheiro");
-                    exit(1);
-                }
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-                execvp(subLine[0], subLine);
+			int subSize = cmdParser(line[0], subLine, ">"); // cat hey.txt hello.txt -> 1
+            if (subSize == 0) {
+                continue;
             }
 
-        }
+			if(subSize == 1){
+				char *subSubLine[MAX_ARGS];
 
-        return 0;
+				int subSubSize = cmdParser(subLine[0], subSubLine ," \t");
+                if (subSubSize == 0) {
+                    continue;
+                }
+                if (strcmp(subSubLine[0], "exit") == 0) {
+                    break;
+                }
 
-    }
+				int pid = fork();
+
+				if(pid < 0){
+					perror("Fork failed");
+					return 1;
+				}
+				else if(pid == 0){
+					execvp(subSubLine[0], subSubLine);
+					exit(0);
+				}
+				else {
+					int status;
+					wait(&status);
+				}
+			}else {
+					int pid = fork();
+
+					if(pid < 0){
+						perror("Fork failed");
+						return 1;
+					}
+				else if(pid == 0){
+					char *dst = subLine[subSize];
+
+					subLine[subSize] = NULL;
+					int fd = open(dst, O_CREAT | O_RDWR | O_TRUNC, 0644);
+
+					if (fd < 0) {
+						perror("Erro ao abrir o ficheiro");
+						exit(1);
+					}
+					dup2(fd, 1);
+					close(fd);
+					execvp(subLine[0], subLine);
+					exit(0);
+				}
+				else {
+					int status;
+					wait(&status);
+				}
+
+			}
+
+		}
+	}
+    return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
