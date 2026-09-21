@@ -23,7 +23,6 @@ int cmdParser(char *input, char *processed[], char *del) {
             break;
         }
 	}
-	processed[idx] = NULL;
 	return idx;
 }
 
@@ -62,6 +61,7 @@ int main(int argc, char *argv[]){
 					return 1;
 				}
 				else if(pid == 0){
+				    subSubLine[subSubSize] = NULL;
 					execvp(subSubLine[0], subSubLine);
 					exit(0);
 				}
@@ -74,33 +74,30 @@ int main(int argc, char *argv[]){
 
 					if(pid < 0){
 						perror("Fork failed");
-						return 1;
-					}
-				else if(pid == 0){
+					return 1;
+				}else if(pid == 0){
 					char *dst = subLine[subSize];
-
 					subLine[subSize] = NULL;
 					int fd = open(dst, O_CREAT | O_RDWR | O_TRUNC, 0644);
 
-					if (fd < 0) {
-						perror("Erro ao abrir o ficheiro");
-						exit(1);
-					}
-					dup2(fd, 1);
-					close(fd);
-					execvp(subLine[0], subLine);
-					exit(0);
-				}
-				else {
-					int status;
-					pid_t filho_terminado = wait(&status);
-				}
+    					if (fd < 0) {
+    						perror("Erro ao abrir o ficheiro");
+    						exit(1);
+    					}
+    					dup2(fd, 1);
+    					close(fd);
+    					execvp(subLine[0], subLine);
+    					exit(0);
+
+    				}else {
+    					int status;
+    					pid_t filho_terminado = wait(&status);
+    				}
 
 			}
 
 		}
 
-    return 0;
-
 	}
+	 return 0;
 }
