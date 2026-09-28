@@ -42,6 +42,20 @@ void waiter(int size, pid_t processes[]) {
     }
 }
 
+char *trimWhitespace(char *str) {
+    //remove da esquerda
+    while(*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r') str++;
+
+    if(*str == 0) return str;
+
+    //remove da direita
+    char *end = str + strlen(str) - 1;
+    while(end > str && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) end--;
+
+    *(end + 1) = 0;
+    return str;
+}
+
 void printArgsWithNull(char **args, int size_with_null) {
     if (args == NULL) {
         printf("Array is NULL\n");
@@ -107,13 +121,12 @@ int main(int argc, char *argv[]){
                     int subInternalSize = cmdParser(internal[0], subInternal, " ");
                     subInternal[subInternalSize] = NULL;
 
-                    printArgsWithNull(subInternal, subInternalSize);
-
                     processes[i] = fork();
                     if(processes[i] < 0) {
                         perror("fork failed");
                         exit(1);
                     }
+
                     if (processes[i] == 0) {
                         if(i == 0){
                             dup2(pipefds[i][1], 1);
@@ -132,9 +145,9 @@ int main(int argc, char *argv[]){
                 }else {
                     char *subInternal[MAX_ARGS];
 
-                    int subInternalSize = cmdParser(internal[0], subInternal, " ");
+                    int subInternalSize = cmdParser(internal[0], subInternal, " \t");
 
-                    char *dst = subInternal[subInternalSize - 1];
+                    char *dst = trimWhitespace(subInternal[subInternalSize - 1]);
 
                     subInternal[subInternalSize] = NULL;
 
@@ -168,6 +181,7 @@ int main(int argc, char *argv[]){
 			char *subLine[MAX_ARGS];
 
 			int subSize = cmdParser(line[0], subLine, ">"); // cat hey.txt hello.txt -> 1
+
             if (subSize == 0) {
                 continue;
             }
@@ -213,9 +227,14 @@ int main(int argc, char *argv[]){
 						return 1;
 					}
 				else if(pid == 0){
-					char *dst = subLine[subSize - 1];
+					char *dst = trimWhitespace(subLine[subSize - 1]);
 
-					subLine[subSize - 1] = NULL;
+                    char *subSubLine[MAX_ARGS];
+
+    				int subSubSize = cmdParser(subLine[0], subSubLine ," \t");
+
+					subSubLine[subSubSize] = NULL;
+
 					int fd = open(dst, O_CREAT | O_RDWR | O_TRUNC, 0644);
 
 					if (fd < 0) {
@@ -224,7 +243,7 @@ int main(int argc, char *argv[]){
 					}
 					dup2(fd, 1);
 					close(fd);
-					execvp(subLine[0], subLine);
+					execvp(subSubLine[0], subSubLine);
 					exit(0);
 				}
 				else {
