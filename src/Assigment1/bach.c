@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdalign.h>
 
 #define MAX_LINE 256
 #define MAX_ARGS 10
@@ -26,6 +26,50 @@ int cmdParser(char *input, char *processed[], char *del) {
 	}
 	processed[idx] = NULL;
 	return idx;
+}
+
+void masking(char *str) {
+    int i = 0;
+    int has_quotes = 0;
+	while(str[i] != '\0') {
+		if(str[i] == '"' || str[i] == '\'') {
+			has_quotes = !has_quotes;
+		}
+		if(has_quotes) {
+			switch (str[i]) {
+				case ' ':
+					str[i] = '\x01';
+					break;
+				case '|':
+					str[i] = '\x02';
+					break;
+				case '>':
+					str[i] = '\x03';
+					break;
+			}
+		}
+		i++;
+	}
+}
+
+
+void unmasking(char *str) {
+    int i = 0;
+	while(str[i] != '\0') {
+		switch (str[i]) {
+			case '\x01':
+				str[i] = ' ';
+				break;
+			case '\x02':
+				str[i] = '|';
+				break;
+			case '\x03':
+				str[i] = '>';
+				break;
+		}
+		i++;
+	}
+
 }
 
 void getCurrentPath() {
@@ -56,6 +100,16 @@ char *trimWhitespace(char *str) {
     return str;
 }
 
+void trimQuotes(char *str) {
+    int len = strlen(str);
+    if (len >= 2 && ((str[0] == '"' && str[len - 1] == '"') || (str[0] == '\'' && str[len - 1] == '\''))) {
+        for (int i = 0; i < len - 2; i++) {
+            str[i] = str[i + 1];
+        }
+        str[len - 2] = '\0';
+    }
+}
+
 void printArgsWithNull(char **args, int size_with_null) {
     if (args == NULL) {
         printf("Array is NULL\n");
@@ -63,7 +117,6 @@ void printArgsWithNull(char **args, int size_with_null) {
     }
 
     printf("Arguments: [ ");
-    // Percorre até size_with_null para incluir a posição do NULL
     for (int i = 0; i <= size_with_null; i++) {
         if (args[i] == NULL) {
             printf("NULL ");
@@ -89,7 +142,7 @@ int main(int argc, char *argv[]){
         buffer[strcspn(buffer, "\n")] = 0;
 
         char *line[MAX_ARGS];
-
+        masking(buffer);
         int size = cmdParser(buffer, line, "|"); // cat hey.txt  hello.txt -> 1
 
         pid_t processes[size];
@@ -118,7 +171,7 @@ int main(int argc, char *argv[]){
 
                 if (internalSize == 1) {
                     char *subInternal[MAX_ARGS];
-                    int subInternalSize = cmdParser(internal[0], subInternal, " ");
+                    int subInternalSize = cmdParser(internal[0], subInternal, " \t");
                     subInternal[subInternalSize] = NULL;
 
                     processes[i] = fork();
@@ -138,6 +191,10 @@ int main(int argc, char *argv[]){
                             dup2(pipefds[i - 1][0], 0);
                             dup2(pipefds[i][1], 1);
                         }
+                        for (int j = 0; j < subInternalSize; j++) {
+                            unmasking(subInternal[j]);
+                            trimQuotes(subInternal[j]);
+                        }
                         execvp(subInternal[0], subInternal);
                         exit(0);
                     }
@@ -149,7 +206,13 @@ int main(int argc, char *argv[]){
 
                     char *dst = trimWhitespace(subInternal[subInternalSize - 1]);
 
+                    unmasking(dst);
+                    trimQuotes(dst);
                     subInternal[subInternalSize] = NULL;
+                    for (int j = 0; j < subInternalSize; j++) {
+                        unmasking(subInternal[j]);
+                        trimQuotes(subInternal[j]);
+                    }
 
 					int fd = open(dst, O_CREAT | O_RDWR | O_TRUNC, 0644);
 
@@ -190,6 +253,12 @@ int main(int argc, char *argv[]){
 				char *subSubLine[MAX_ARGS];
 
 				int subSubSize = cmdParser(subLine[0], subSubLine ," \t");
+
+				for (int i = 0; i < subSubSize; i++) {
+					unmasking(subSubLine[i]);
+					trimQuotes(subSubLine[i]);
+				}
+				printArgsWithNull(subSubLine, subSubSize);
                 if (subSubSize == 0) {
                     continue;
                 }
@@ -234,7 +303,12 @@ int main(int argc, char *argv[]){
     				int subSubSize = cmdParser(subLine[0], subSubLine ," \t");
 
 					subSubLine[subSubSize] = NULL;
-
+					for (int i = 0; i < subSubSize; i++) {
+						unmasking(subSubLine[i]);
+						trimQuotes(subSubLine[i]);
+					}
+					unmasking(dst);
+					trimQuotes(dst);
 					int fd = open(dst, O_CREAT | O_RDWR | O_TRUNC, 0644);
 
 					if (fd < 0) {
